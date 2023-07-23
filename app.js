@@ -6,6 +6,7 @@ const app = express();
 app.use(express.json());
 
 const sqlite = require("sqlite");
+const { open } = sqlite;
 //console.log(sqlite);
 
 const sqlite3 = require("sqlite3");
@@ -17,15 +18,15 @@ const filePath = path.join(__dirname, "moviesData.db");
 //console.log(filePath);
 
 let db = null;
+
 const dbServer = async () => {
   try {
-    db = await sqlite.open({
+    db = await open({
       filename: filePath,
       driver: sqlite3.Database,
     });
-    //console.log(typeof(db));
     app.listen(3000, () => {
-      console.log("server is running");
+      console.log("server running");
     });
   } catch (e) {
     console.log(e.message);
@@ -34,15 +35,21 @@ const dbServer = async () => {
 
 dbServer();
 
-//call api on get
+//call api 1 on get
+const dbToRes = (each) => {
+  return {
+    movieName: each.movie_name,
+  };
+};
 app.get("/movies/", async (req, res) => {
   const query = `
         SELECT * FROM movie;`;
-  let dbResponse = await db.all(query);
-  res.send(dbResponse);
+  let response = await db.all(query);
+  const resObj = response.map((each) => dbToRes(each));
+  res.send(resObj);
 });
 
-//call api on post
+//call api 2 on post
 
 app.post("/movies/", async (req, res) => {
   const body = req.body;
@@ -52,23 +59,37 @@ app.post("/movies/", async (req, res) => {
        INSERT INTO 
           movie(director_id,movie_name,lead_actor)
        VALUES
-          (directorId,movieName,leadActor);`;
+          (${directorId},'${movieName}','${leadActor}');`;
   const response = await db.run(query);
   res.send("Movie Successfully Added");
   //console.log();
 });
 
-//api call on get
+//api call 3 on get
 app.get("/movies/:movieId/", async (req, res) => {
   const { movieId } = req.params;
   const query = `
         select * from movie 
         where movie_id=${movieId};`;
-  let dbResponse = await db.all(query);
-  res.send(dbResponse);
+  const response = await db.get(query);
+  //const resObj = response.map((each) => dbToRes(each));
+  res.send({
+    movieId: response.movie_id,
+    directorId: response.director_id,
+    movieName: response.movie_name,
+    leadActor: response.lead_actor,
+  });
 });
+/*movie_id	INTEGER
+director_id	INTEGER
+movie_name	TEXT
+lead_actor	TEXT
+/*movieId: 12,
+  directorId: 3,
+  movieName: "The Lord of the Rings",
+  leadActor: "Elijah Wood",*/
 
-//api call put
+//api call 4 put
 app.put("/movies/:movieId/", (req, res) => {
   const { movieId } = req.params;
   const { directorId, movieName, leadActor } = req.body;
@@ -83,7 +104,7 @@ app.put("/movies/:movieId/", (req, res) => {
   res.send("Movie Details Updated");
 });
 
-//api call on delete
+//api call 5  on delete
 
 app.delete("/movies/:movieId/", async (req, res) => {
   const { movieId } = req.params;
@@ -94,23 +115,34 @@ app.delete("/movies/:movieId/", async (req, res) => {
   res.send("Movie Removed");
 });
 
-//api call on directors get
+//api call 6 on directors get
 
+const dbToResOfDire = (each) => {
+  return {
+    directorId: each.director_id,
+    directorName: each.director_name,
+  };
+};
 app.get("/directors/", async (req, res) => {
   const query = `
         SELECT * FROM director;`;
   const response = await db.all(query);
-  res.send(response);
+  const resObj = response.map((each) => dbToResOfDire(each));
+  res.send(resObj);
 });
+
+// api call 7
 
 app.get("/directors/:directorId/movies/", async (req, res) => {
   const { directorId } = req.params;
   const query = `
-       SELECT movie_name 
+       SELECT movie_name
        FROM movie
          WHERE director_id=${directorId};`;
-  const response = await db.get(query);
-  res.send(response);
+  const response = await db.all(query);
+  console.log(response);
+  const resObj = response.map((each) => dbToRes(each));
+  res.send(resObj);
 });
 
 module.exports = app;
